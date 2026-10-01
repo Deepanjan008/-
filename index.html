@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="theme-color" content="#03060d" />
+<title>J.A.R.V.I.S</title>
+<style>
+  :root{
+    --bg:#03060d;
+    --accent:#00e5ff;
+    --text:#d8f4ff;
+    --muted:#5f8496;
+    --line:rgba(0,229,255,.14);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0;padding:0;height:100%;overflow:hidden;
+    background:var(--bg);color:var(--text);
+    font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    overscroll-behavior:none;
+  }
+  body::before{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(circle at 50% 22%, rgba(0,140,200,.20), transparent 62%),
+      radial-gradient(circle at 50% 115%, rgba(0,200,255,.12), transparent 58%);
+  }
+  body::after{
+    content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.35;
+    background-image:
+      linear-gradient(rgba(0,229,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,.05) 1px, transparent 1px);
+    background-size:44px 44px;
+    mask-image:radial-gradient(circle at 50% 40%, #000 20%, transparent 78%);
+    -webkit-mask-image:radial-gradient(circle at 50% 40%, #000 20%, transparent 78%);
+  }
+
+  .app{
+    position:relative;z-index:1;
+    display:flex;flex-direction:column;
+    height:100vh;height:100dvh;
+    padding:calc(env(safe-area-inset-top) + 8px) 14px calc(env(safe-area-inset-bottom) + 8px);
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+    padding:4px 2px 8px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;}
+  .logo{
+    width:26px;height:26px;border-radius:50%;
+    border:1.5px solid var(--accent);
+    box-shadow:0 0 10px rgba(0,229,255,.55), inset 0 0 8px rgba(0,229,255,.35);
+    position:relative;flex:0 0 auto;
+  }
+  .logo::after{
+    content:'';position:absolute;inset:7px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 10px var(--accent);
+    animation:pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:.45;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+  h1{
+    margin:0;font-size:15px;letter-spacing:.22em;font-weight:600;
+    color:#eafcff;text-shadow:0 0 14px rgba(0,229,255,.6);
+  }
+  #statusText{
+    margin:2px 0 0;font-size:9.5px;letter-spacing:.16em;
+    color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    transition:color .25s;
+  }
+  body[data-mode="listening"] #statusText{color:#00e5ff;}
+  body[data-mode="thinking"]  #statusText{color:#ffb020;}
+  body[data-mode="speaking"]  #statusText{color:#00ffa3;}
+
+  .icon-btn{
+    width:38px;height:38px;border-radius:12px;flex:0 0 auto;
+    background:rgba(0,229,255,.06);border:1px solid var(--line);
+    color:var(--accent);font-size:15px;display:grid;place-items:center;
+    cursor:pointer;transition:.2s;
+  }
+  .icon-btn:active{transform:scale(.93);background:rgba(0,229,255,.16);}
+  .icon-btn.off{color:#3d5560;border-color:rgba(255,255,255,.06);}
+
+  /* ---------- Orb stage ---------- */
+  .stage{
+    flex:1 1 44%;min-height:150px;position:relative;display:grid;place-items:center;
+  }
+  #orb{position:absolute;inset:0;width:100%;height:100%;display:block;}
+
+  /* ---------- Transcript ---------- */
+  .log{
+    flex:1 1 56%;min-height:0;overflow-y:auto;overflow-x:hidden;
+    display:flex;flex-direction:column;gap:8px;
+    padding:10px 2px 12px;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .log::-webkit-scrollbar{display:none;}
+
+  .msg{
+    max-width:86%;padding:9px 13px;border-radius:15px;
+    font-size:13.5px;line-height:1.45;word-wrap:break-word;
+    animation:rise .28s cubic-bezier(.2,.8,.3,1) both;
+  }
+  @keyframes rise{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+
+  .msg.user{
+    align-self:flex-end;
+    background:linear-gradient(140deg, rgba(0,229,255,.20), rgba(0,140,200,.14));
+    border:1px solid rgba(0,229,255,.30);
+    border-bottom-right-radius:5px;
+    color:#eafcff;
+  }
+  .msg.jarvis{
+    align-self:flex-start;
+    background:rgba(255,255,255,.035);
+    border:1px solid var(--line);
+    border-left:2px solid var(--accent);
+    border-bottom-left-radius:5px;
+    color:#c4e8f5;
+    box-shadow:0 0 18px rgba(0,229,255,.06);
+  }
+  .msg.sys{
+    align-self:center;text-align:center;max-width:94%;
+    background:transparent;border:1px dashed rgba(255,255,255,.10);
+    color:var(--muted);font-size:11.5px;letter-spacing:.04em;
+    font-family:ui-monospace,Menlo,monospace;
+    border-radius:10px;padding:7px 12px;
+  }
+  .msg.interim{opacity:.55;font-style:italic;}
+
+  /* ---------- Controls ---------- */
+  footer{flex:0 0 auto;padding-top:4px;}
+
+  .input-row{
+    display:flex;gap:8px;align-items:center;margin-bottom:10px;
+  }
+  #textInput{
+    flex:1;min-width:0;height:42px;padding:0 14px;
+    background:rgba(255,255,255,.04);
+    border:1px solid var(--line);border-radius:13px;
+    color:var(--text);font-size:14px;outline:none;
+    transition:border-color .2s, box-shadow .2s;
+  }
+  #textInput::placeholder{color:#3f5b68;}
+  #textInput:focus{
+    border-color:rgba(0,229,255,.45);
+    box-shadow:0 0 0 3px rgba(0,229,255,.08);
+  }
+  .send{
+    width:42px;height:42px;flex:0 0 auto;border-radius:13px;
+    background:rgba(0,229,255,.10);border:1px solid var(--line);
+    color:var(--accent);font-size:15px;cursor:pointer;
+    display:grid;place-items:center;transition:.18s;
+  }
+  .send:active{transform:scale(.92);background:rgba(0,229,255,.24);}
+
+  .mic-row{display:grid;place-items:center;padding-bottom:2px;}
+  .mic{
+    position:relative;width:66px;height:66px;border-radius:50%;
+    border:1.5px solid rgba(0,229,255,.5);
+    background:radial-gradient(circle at 50% 35%, rgba(0,229,255,.28), rgba(0,229,255,.05) 65%);
+    color:var(--accent);cursor:pointer;
+    display:grid;place-items:center;
+    box-shadow:0 0 22px rgba(0,229,255,.28), inset 0 0 18px rgba(0,229,255,.14);
+    transition:transform .15s, box-shadow .25s, background .25s;
+    touch-action:manipulation;
+  }
+  .mic svg{width:27px;height:27px;fill:currentColor;filter:drop-shadow(0 0 6px rgba(0,229,255,.7));}
+  .mic:active{transform:scale(.93);}
+
+  body[data-mode="listening"] .mic{
+    background:radial-gradient(circle at 50% 35%, rgba(0,229,255,.55), rgba(0,229,255,.10) 70%);
+    box-shadow:0 0 40px rgba(0,229,255,.65), inset 0 0 24px rgba(0,229,255,.35);
+    border-color:#00e5ff;
+  }
+  body[data-mode="thinking"] .mic{
+    border-color:#ffb020;color:#ffb020;
+    box-shadow:0 0 30px rgba(255,176,32,.45), inset 0 0 20px rgba(255,176,32,.18);
+  }
+  body[data-mode="speaking"] .mic{
+    border-color:#00ffa3;color:#00ffa3;
+    box-shadow:0 0 34px rgba(0,255,163,.45), inset 0 0 20px rgba(0,255,163,.18);
+  }
+
+  .mic::before,.mic::after{
+    content:'';position:absolute;inset:-1px;border-radius:50%;
+    border:1px solid rgba(0,229,255,.55);opacity:0;pointer-events:none;
+  }
+  body[data-mode="listening"] .mic::before{animation:ripple 1.8s ease-out infinite;}
+  body[data-mode="listening"] .mic::after{animation:ripple 1.8s ease-out .9s infinite;}
+  @keyframes ripple{
+    0%{transform:scale(1);opacity:.7}
+    100%{transform:scale(1.85);opacity:0}
+  }
+
+  @media (max-height:620px){
+    .stage{flex:1 1 34%;min-height:110px;}
+    .mic{width:58px;height:58px;}
+    .mic svg{width:23px;height:23px;}
+  }
+</style>
+</head>
+<body data-mode="idle">
+
+<div class="app">
+  <header>
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>J.A.R.V.I.S</h1>
+        <p id="statusText">ONLINE · TAP TO SPEAK</p>
+      </div>
+    </div>
+    <button id="muteBtn" class="icon-btn" aria-label="Toggle voice">🔊</button>
+  </header>
+
+  <section class="stage">
+    <canvas id="orb"></canvas>
+  </section>
+
+  <section class="log" id="log"></section>
+
+  <footer>
+    <div class="input-row">
+      <input id="textInput" type="text" placeholder="Type a command…"
+             autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" />
+      <button id="sendBtn" class="send" aria-label="Send">➤</button>
+    </div>
+    <div class="mic-row">
+      <button id="micBtn" class="mic" aria-label="Speak">
+        <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5.3-3a5.3 5.3 0 0 1-10.6 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-1.7z"/></svg>
+      </button>
+    </div>
+  </footer>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ══════════════ ELEMENTS ══════════════ */
+  const logEl     = document.getElementById('log');
+  const statusEl  = document.getElementById('statusText');
+  const micBtn    = document.getElementById('micBtn');
+  const textInput = document.getElementById('textInput');
+  const sendBtn   = document.getElementById('sendBtn');
+  const muteBtn   = document.getElementById('muteBtn');
+  const canvas    = document.getElementById('orb');
+  const ctx       = canvas.getContext('2d');
+
+  /* ══════════════ STATE ══════════════ */
+  let mode = 'idle';
+  let muted = false;
+  let amp = 0;
+  const COLORS = { idle:'#1b6f96', listening:'#00e5ff', thinking:'#ffb020', speaking:'#00ffa3' };
+
+  /* ══════════════ HUD HELPERS ══════════════ */
+  const LABELS = {
+    idle: 'ONLINE · TAP TO SPEAK',
+    listening: 'LISTENING…',
+    thinking: 'PROCESSING…',
+    speaking: 'SPEAKING…'
+  };
+  function setMode(m){
+    mode = m;
+    document.body.dataset.mode = m;
+    statusEl.textContent = LABELS[m] || m;
+  }
+
+  function addMsg(who, text){
+    const el = document.createElement('div');
+    el.className = 'msg ' + who;
+    el.textContent = text;
+    logEl.appendChild(el);
+    while (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
+    logEl.scrollTop = logEl.scrollHeight;
+    return el;
+  }
+
+  /* ══════════════ ORB CANVAS ══════════════ */
+  let W = 0, H = 0, DPR = 1;
+  const BARS = 64;
+  const barVals = new Float32Array(BARS);
+  const particles = Array.from({ length: 34 }, () => ({
+    a: Math.random() * Math.PI * 2,
+    r: 0.8 + Math.random() * 0.75,
+    sp: (Math.random() * 0.5 + 0.15) * (Math.random() < 0.5 ? -1 : 1),
+    s: Math.random() * 1.3 + 0.5
+  }));
+
+  function hexA(hex, a){
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  }
+
+  function resize(){
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const r = canvas.getBoundingClientRect();
+    W = Math.max(1, r.width); H = Math.max(1, r.height);
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 220));
+
+  function draw(){
+    requestAnimationFrame(draw);
+    const t = performance.now() / 1000;
+    const cx = W / 2, cy = H / 2;
+    const R = Math.min(W, H) * 0.29;
+    const col = COLORS[mode] || COLORS.idle;
+
+    /* amplitude target per mode */
+    let target;
+    switch (mode){
+      case 'listening': target = 0.55 + 0.45 * Math.abs(Math.sin(t * 7.3)); break;
+      case 'speaking':  target = 0.45 + 0.55 * Math.abs(Math.sin(t * 10.7) * Math.sin(t * 3.3)); break;
+      case 'thinking':  target = 0.24 + 0.26 * Math.abs(Math.sin(t * 3.1)); break;
+      default:          target = 0.06 + 0.05 * Math.sin(t * 1.4);
+    }
+    amp += (target - amp) * 0.14;
+
+    ctx.clearRect(0, 0, W, H);
+
+    /* dashed outer ring */
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(t * 0.22);
+    ctx.setLineDash([2, 11]);
+    ctx.strokeStyle = hexA(col, 0.20);
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, 0, R * 1.52, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    ctx.setLineDash([]);
+
+    /* radial audio bars */
+    ctx.lineCap = 'round';
+    for (let i = 0; i < BARS; i++){
+      const a = (i / BARS) * Math.PI * 2 - Math.PI / 2 + t * 0.38;
+      const w = 0.5 + 0.5 * Math.sin(i * 0.41 + t * 2.6) * Math.sin(i * 0.13 - t * 1.7);
+      const v = amp * (0.28 + 0.72 * Math.abs(w));
+      barVals[i] += (v - barVals[i]) * 0.25;
+      const r0 = R * 1.06;
+      const r1 = r0 + barVals[i] * R * 0.6;
+      ctx.strokeStyle = hexA(col, 0.18 + barVals[i] * 0.95);
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+      ctx.stroke();
+    }
+
+    /* core glow */
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.1);
+    g.addColorStop(0,   hexA(col, 0.45 + amp * 0.45));
+    g.addColorStop(0.35,hexA(col, 0.14));
+    g.addColorStop(1,   hexA(col, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 1.1, 0, Math.PI * 2); ctx.fill();
+
+    /* inner ring */
+    ctx.strokeStyle = hexA(col, 0.5);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.63, 0, Math.PI * 2); ctx.stroke();
+
+    /* rotating arcs */
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(-t * 0.65);
+    ctx.strokeStyle = hexA(col, 0.85);
+    ctx.lineWidth = 2.6;
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.63, 0, Math.PI * 0.45); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, R * 0.63, Math.PI, Math.PI * 1.4); ctx.stroke();
+    ctx.restore();
+
+    /* orbiting particles */
+    for (const p of particles){
+      const a = p.a + t * p.sp * 0.42;
+      const rr = R * (p.r + amp * 0.22);
+      ctx.fillStyle = hexA(col, 0.45);
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, p.s, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    /* core */
+    ctx.fillStyle = hexA(col, 0.9);
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 0.14 * (1 + amp * 0.7), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /* ══════════════ SPEECH SYNTHESIS ══════════════ */
+  let voices = [];
+  let selectedVoice = null;
+
+  function scoreVoice(v){
+    const n = (v.name || '').toLowerCase();
+    const l = (v.lang || '').toLowerCase();
+    let s = 0;
+    if (/google uk english male/.test(n)) s += 14;
+    if (/\b(daniel|arthur|oliver|george|ryan|guy)\b/.test(n)) s += 10;
+    if (/male/.test(n)) s += 4;
+    if (l.startsWith('en-gb')) s += 8;
+    else if (l.startsWith('en-au')) s += 5;
+    else if (l.startsWith('en')) s += 4;
+    if (/female|zira|samantha|karen|moira|tessa|victoria|susan|allison/.test(n)) s -= 8;
+    return s;
+  }
+  function loadVoices(){
+    if (!('speechSynthesis' in window)) return;
+    voices = speechSynthesis.getVoices() || [];
+    if (!voices.length) return;
+    selectedVoice = voices.slice().sort((a, b) => scoreVoice(b) - scoreVoice(a))[0] || null;
+  }
+  if ('speechSynthesis' in window){
+    loadVoices();
+    speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  }
+
+  let unlocked = false;
+  function unlockAudio(){
+    if (unlocked || !('speechSynthesis' in window)) return;
+    unlocked = true;
+    try {
+      const u = new SpeechSynthesisUtterance(' ');
+      u.volume = 0;
+      speechSynthesis.speak(u);
+    } catch (e) { /* ignore */ }
+  }
+
+  function speak(text){
+    return new Promise(resolve => {
+      if (!('speechSynthesis' in window) || muted || !text){
+        resolve(); return;
+      }
+      try { speechSynthesis.cancel(); } catch (e) {}
+
+      const u = new SpeechSynthesisUtterance(String(text));
+      if (selectedVoice) u.voice = selectedVoice;
+      u.rate = 0.97;
+      u.pitch = 0.85;
+      u.volume = 1;
+
+      let done = false;
+      const finish = () => { if (done) return; done = true; clearTimeout(guard); resolve(); };
+      const guard = setTimeout(finish, Math.min(25000, 2500 + String(text).length * 95));
+
+      u.onend = finish;
+      u.onerror = finish;
+
+      setMode('speaking');
+      speechSynthesis.speak(u);
+    });
+  }
+
+  /* ══════════════ SPEECH RECOGNITION ══════════════ */
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recog = null;
+  let listening = false;
+  let finalText = '';
+  let interimEl = null;
+
+  function showInterim(text){
+    if (!interimEl) interimEl = addMsg('user interim', '');
+    interimEl.textContent = text || '…';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  function clearInterim(){
+    if (interimEl){ interimEl.remove(); interimEl = null; }
+  }
+
+  if (SR){
+    recog = new SR();
+    recog.lang = 'en-US';
+    recog.interimResults = true;
+    recog.continuous = false;
+    recog.maxAlternatives = 1;
+
+    recog.onstart = () => { listening = true; setMode('listening'); };
+
+    recog.onresult = (e) => {
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++){
+        const r = e.results[i];
+        if (r.isFinal) finalText += r[0].transcript;
+        else interim += r[0].transcript;
+      }
+      showInterim((finalText + interim).trim());
+    };
+
+    recog.onerror = (e) => {
+      listening = false;
+      clearInterim();
+      finalText = '';
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed'){
+        addMsg('sys', 'Microphone blocked. Enable mic permission in your browser settings, or type below.');
+      } else if (e.error === 'no-speech'){
+        addMsg('sys', "I didn't catch that — try again.");
+      } else if (e.error === 'network'){
+        addMsg('sys', 'Speech service unreachable. Check your connection.');
+      } else if (e.error !== 'aborted'){
+        addMsg('sys', 'Voice error: ' + e.error);
+      }
+      setMode('idle');
+    };
+
+    recog.onend = () => {
+      listening = false;
+      clearInterim();
+      const t = finalText.trim();
+      finalText = '';
+      if (t) processUser(t);
+      else setMode('idle');
+    };
+  }
+
+  function startListening(){
+    if (!recog){
+      addMsg('sys', 'Speech recognition is not supported here. Use the text box instead.');
+      return;
+    }
+    unlockAudio();
+    if (listening){ try { recog.stop(); } catch (e) {} return; }
+    if ('speechSynthesis' in window && speechSynthesis.speaking){
+      try { speechSynthesis.cancel(); } catch (e) {}
+    }
+    finalText = '';
+    try { recog.start(); }
+    catch (e) { /* already running */ }
+  }
+
+  micBtn.addEventListener('click', startListening);
+
+  /* ══════════════ MUTE ══════════════ */
+  muteBtn.addEventListener('click', () => {
+    muted = !muted;
+    muteBtn.textContent = muted ? '🔇' : '🔊';
+    muteBtn.classList.toggle('off', muted);
+    if (muted && 'speechSynthesis' in window){
+      try { speechSynthesis.cancel(); } catch (e) {}
+      setMode('idle');
+    }
+  });
+
+  /* ══════════════ TEXT INPUT ══════════════ */
+  function submitText(){
+    const v = textInput.value.trim();
+    if (!v) return;
+    textInput.value = '';
+    unlockAudio();
+    processUser(v);
+  }
+  sendBtn.addEventListener('click', submitText);
+  textInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter'){ e.preventDefault(); submitText(); }
+  });
+
+  /* ══════════════ PIPELINE ══════════════ */
+  async function processUser(text){
+    addMsg('user', text);
+    setMode('thinking');
+
+    let reply = null;
+    try {
+      reply = await respond(text);
+    } catch (err){
+      console.error(err);
+      reply = 'I ran into a problem handling that request.';
+    }
+
+    if (reply == null){ setMode('idle'); return; }
+
+    addMsg('jarvis', reply);
+    if (muted){ setMode('idle'); return; }
+    await speak(reply);
+    setMode('idle');
+  }
+
+  /* ══════════════ WEATHER (Open-Meteo, no key) ══════════════ */
+  const WMO = {
+    0:'clear sky',1:'mainly clear',2:'partly cloudy',3:'overcast',45:'foggy',48:'icy fog',
+    51:'light drizzle',53:'drizzle',55:'heavy drizzle',56:'freezing drizzle',57:'freezing drizzle',
+    61:'light rain',63:'rain',65:'heavy rain',66:'freezing rain',67:'freezing rain',
+    71:'light snow',73:'snow',75:'heavy snow',77:'snow grains',
+    80:'light showers',81:'showers',82:'heavy showers',85:'snow showers',86:'heavy snow showers',
+    95:'thunderstorms',96:'thunderstorms with hail',99:'severe thunderstorms with hail'
+  };
+
+  async function getWeather(city){
+    const geo = await fetch(
+      'https://geocoding-api.open-meteo.com/v1/search?count=1&language=en&format=json&name=' +
+      encodeURIComponent(city)
+    ).then(r => r.json());
+
+    if (!geo.results || !geo.results.length)
+      return `I couldn't locate a place called ${city}.`;
+
+    const p = geo.results[0];
+    const wx = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}` +
+      `&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=celsius`
+    ).then(r => r.json());
+
+    const c = wx.current;
+    const desc = WMO[c.weather_code] || 'unclear conditions';
+    const place = p.name + (p.country ? ', ' + p.country : '');
+    return `It's currently ${Math.round(c.temperature_2m)} degrees Celsius in ${place}, with ${desc}. ` +
+           `Humidity is ${c.relative_humidity_2m} percent, and wind is ${Math.round(c.wind_speed_10m)} kilometres per hour.`;
+  }
+
+  /* ══════════════ MATH ══════════════ */
+  function tryMath(s){
+    let e = s
+      .replace(/^(what('s| is)|calculate|compute|work out|solve|evaluate|how much is)\s+/, '')
+      .replace(/\bplus\b/g, '+')
+      .replace(/\bminus\b/g, '-')
+      .replace(/\b(times|multiplied by|x)\b/g, '*')
+      .replace(/\b(divided by|over)\b/g, '/')
+      .replace(/\bto the power of\b/g, '**')
+      .replace(/\bpercent\b/g, '%')
+      .replace(/,/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    const pct = e.match(/^([\d.]+)\s*%\s*of\s*([\d.]+)$/);
+    if (pct) return (+pct[1] / 100) * (+pct[2]);
+
+    if (!/^[\d\s+\-*/().^]+$/.test(e)) return null;
+    if (!/\d/.test(e)) return null;
+    if (!/[+\-*/^]/.test(e)) return null;
+
+    try {
+      const v = Function('"use strict";return (' + e.replace(/\^/g, '**') + ')')();
+      if (typeof v === 'number' && isFinite(v)) return v;
+    } catch (err) {}
+    return null;
+  }
+
+  function fmtNum(n){
+    if (Number.isInteger(n)) return n.toLocaleString('en-US');
+    return parseFloat(n.toFixed(6)).toLocaleString('en-US', { maximumFractionDigits: 6 });
+  }
+
+  /* ══════════════ THE BRAIN ══════════════ */
+  const JOKES = [
+    "Why did the developer go broke? Because he used up all his cache.",
+    "There are only two hard problems in computer science: cache invalidation, naming things, and off-by-one errors.",
+    "I told my computer I needed a break. It said: no problem, I'll go to sleep.",
+    "Why do programmers prefer dark mode? Because light attracts bugs.",
+    "A SQL query walks into a bar, approaches two tables and asks: may I join you?",
+    "I would tell you a UDP joke, but you might not get it.",
+    "Why did the neural network cross the road? It was trained to."
+  ];
+
+  const SITES = {
+    youtube:'https://www.youtube.com', google:'https://www.google.com', github:'https://github.com',
+    gmail:'https://mail.google.com', maps:'https://maps.google.com', twitter:'https://twitter.com',
+    x:'https://x.com', reddit:'https://www.reddit.com', wikipedia:'https://www.wikipedia.org',
+    spotify:'https://open.spotify.com', netflix:'https://www.netflix.com',
+    whatsapp:'https://web.whatsapp.com', chatgpt:'https://chatgpt.com', linkedin:'https://www.linkedin.com'
+  };
+
+  async function respond(raw){
+    const s = raw.toLowerCase().trim().replace(/[?!.]+$/g, '').trim();
+
+    /* ---- stop / silence ---- */
+    if (/^(stop|stop it|be quiet|quiet|shut up|silence|cancel|never ?mind|nevermind)$/.test(s)){
+      if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
+      setMode('idle');
+      return null;
+    }
+
+    /* ---- clear log ---- */
+    if (/^(clear|clear the|clear the log|clear chat|clear screen|reset)/.test(s)){
+      logEl.innerHTML = '';
+      return 'Console cleared.';
+    }
+
+    /* ---- greetings ---- */
+    if (/^(hello|hi|hey|yo|greetings|good morning|good afternoon|good evening|good day)\b/.test(s)){
+      const h = new Date().getHours();
+      const part = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+      return `${part}. J.A.R.V.I.S online and at your service.`;
+    }
+
+    /* ---- how are you ---- */
+    if (/how are you|how('s| is) it going|how do you do/.test(s)){
+      return 'All systems nominal. Reactor at full capacity. How may I assist you?';
+    }
+
+    /* ---- identity ---- */
+    if (/(your name|who are you|what are you|introduce yourself)/.test(s)){
+      return 'I am J.A.R.V.I.S — Just A Rather Very Intelligent System. Your voice-controlled assistant, running entirely in your browser.';
+    }
+
+    /* ---- capabilities ---- */
+    if (/(what can you do|help|commands|capabilities|what do you do)/.test(s)){
+      return 'I can tell you the time and date, report the weather for any city, do calculations, set timers, ' +
+             'flip coins, roll dice, tell jokes, search the web, and open sites like YouTube or GitHub. ' +
+             'Just speak naturally.';
+    }
+
+    /* ---- thanks ---- */
+    if (/(thank you|thanks|cheers|appreciate)/.test(s)){
+      return 'Always a pleasure.';
+    }
+
+    /* ---- compliments ---- */
+    if (/(you('re| are) (awesome|great|amazing|the best|smart)|good job|well done)/.test(s)){
+      return 'I do try. Thank you.';
+    }
+
+    /* ---- meaning of life ---- */
+    if (/meaning of life|ultimate question/.test(s)){
+      return 'Forty-two. Though I suspect the question is still being formulated.';
+    }
+
+    /* ---- TIMER (before time) ---- */
+    if (/(set (a )?timer|timer for|remind me in|countdown)/.test(s)){
+      const m = s.match(/(\d+(?:\.\d+)?)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?)/);
+      if (!m) return 'How long should the timer be? For example, "set a timer for five minutes".';
+      const n = parseFloat(m[1]);
+      const unit = m[2];
+      let ms, label;
+      if (unit.startsWith('sec')){ ms = n * 1000; label = n + (n === 1 ? ' second' : ' seconds'); }
+      else if (unit.startsWith('min')){ ms = n * 60000; label = n + (n === 1 ? ' minute' : ' minutes'); }
+      else { ms = n * 3600000; label = n + (n === 1 ? ' hour' : ' hours'); }
+
+      if (ms <= 0 || ms > 86400000) return 'Please choose a duration between one second and twenty-four hours.';
+
+      setTimeout(async () => {
+        addMsg('jarvis', `⏰ Your ${label} timer has elapsed.`);
+        if (!muted) await speak(`Sir, your ${label} timer has elapsed.`);
+        setMode('idle');
+      }, ms);
+
+      return `Timer set for ${label}.`;
+    }
+
+    /* ---- TIME ---- */
+    if (/\b(time|clock)\b/.test(s) && !/sometimes/.test(s)){
+      const d = new Date();
+      const t = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      return `It is currently ${t}.`;
+    }
+
+    /* ---- DATE ---- */
+    if (/\b(date|what day|today's date|day is it)\b/.test(s)){
+      const d = new Date();
+      return `Today is ${d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' })}.`;
+    }
+
+    /* ---- WEATHER ---- */
+    if (/weather|temperature|forecast|how (hot|cold|warm) is it|raining/.test(s)){
+      let city = null;
+      const m = s.match(/\b(?:in|at|for|of)\s+([a-z\s'\-]+?)(?:\s+(?:right now|today|tomorrow|please|now))?$/);
+      if (m) city = m[1].trim();
+      if (!city){
+        const m2 = s.match(/\b(?:weather|forecast|temperature)\s+(?:in|at|for|of)?\s*([a-z\s'\-]+)$/);
+        if (m2) city = m2[1].trim();
+      }
+      if (!city || city === 'it' || city === 'the weather')
+        return 'Which city would you like the weather for?';
+      return await getWeather(city);
+    }
+
+    /* ---- JOKE ---- */
+    if (/joke|make me laugh|something funny/.test(s)){
+      return JOKES[Math.floor(Math.random() * JOKES.length)];
+    }
+
+    /* ---- COIN FLIP ---- */
+    if (/flip a coin|coin flip|heads or tails/.test(s)){
+      return Math.random() < 0.5 ? 'Heads.' : 'Tails.';
+    }
+
+    /* ---- DICE ---- */
+    if (/roll (a |the )?(dice|die|d6)/.test(s)){
+      return `You rolled a ${Math.floor(Math.random() * 6) + 1}.`;
+    }
+
+    /* ---- RANDOM NUMBER ---- */
+    if (/random number|pick a number/.test(s)){
+      const m = s.match(/between\s+(\d+)\s+and\s+(\d+)/);
+      if (m){
+        const lo = parseInt(m[1], 10), hi = parseInt(m[2], 10);
+        const a = Math.min(lo, hi), b = Math.max(lo, hi);
+        return `I pick ${Math.floor(Math.random() * (b - a + 1)) + a}.`;
+      }
+      return `I pick ${Math.floor(Math.random() * 100) + 1}.`;
+    }
+
+    /* ---- REPEAT ---- */
+    if (/^(repeat after me|say)\s+(.+)/.test(s)){
+      const phrase = raw.trim().replace(/^(repeat after me|say)\s+/i, '');
+      return phrase;
+    }
+
+    /* ---- SEARCH ---- */
+    const searchM = s.match(/^(?:search|google|look up|find)\s+(?:for\s+)?(.+)$/);
+    if (searchM){
+      const q = searchM[1];
+      const url = 'https://www.google.com/search?q=' + encodeURIComponent(q);
+      setTimeout(() => { window.location.href = url; }, 1100);
+      return `Searching for ${q}.`;
+    }
+
+    /* ---- OPEN SITE ---- */
+    const openM = s.match(/^(?:open|go to|launch|navigate to)\s+(.+)$/);
+    if (openM){
+      const key = openM[1].trim().replace(/\s+/g, '');
+      const url = SITES[key] ||
+                  (/^[\w-]+(\.[\w-]+)+/.test(key) ? 'https://' + key : null);
+      if (url){
+        setTimeout(() => { window.location.href = url; }, 1100);
+        return `Opening ${openM[1].trim()}.`;
+      }
+      const q = openM[1].trim();
+      setTimeout(() => { window.location.href = 'https://www.google.com/search?q=' + encodeURIComponent(q); }, 1100);
+      return `I don't have ${q} bookmarked, searching for it instead.`;
+    }
+
+    /* ---- MATH ---- */
+    const math = tryMath(s);
+    if (math !== null){
+      return `That would be ${fmtNum(math)}.`;
+    }
+
+    /* ---- FALLBACK ---- */
+    return "I'm not certain how to help with that. Try asking for the time, the weather in a city, " +
+           "a calculation, or say 'what can you do'.";
+  }
+
+  /* ══════════════ BOOT ══════════════ */
+  resize();
+  draw();
+  setMode('idle');
+
+  addMsg('sys', SR
+    ? 'J.A.R.V.I.S online · tap the mic and speak'
+    : 'Speech recognition unavailable · type your commands below');
+
+  window.addEventListener('load', resize);
+  window.addEventListener('pageshow', resize);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && 'speechSynthesis' in window){
+      try { speechSynthesis.cancel(); } catch (e) {}
+      setMode('idle');
+    }
+  });
+})();
+</script>
+</body>
+</html>
